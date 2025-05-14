@@ -1,4 +1,7 @@
 import asyncio
+from typing import Any
+
+import dp
 from aiogram import Bot, Dispatcher
 from dotenv import load_dotenv
 import os
@@ -10,6 +13,11 @@ from bot.database.db import create_pool, create_table
 # Загружаем переменные окружения
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+
+bot: Any = Bot(token=BOT_TOKEN)
+bot.dp = dp
+bot.db_state = {}
 
 
 async def main():

@@ -93,3 +93,14 @@ async def get_all_participants_data(pool):
             ORDER BY registration_time DESC
         """)
         return [dict(row) for row in rows]
+
+
+async def get_participant_by_id(pool, user_id: int):
+    """Получает данные пользователя по его Telegram ID."""
+    async with pool.acquire() as connection:
+        row = await connection.fetchrow("""
+            SELECT * FROM participants
+            WHERE telegram_user_id = $1
+        """, user_id)
+        return dict(row) if row else None
+
