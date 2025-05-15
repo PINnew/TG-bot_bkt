@@ -2,6 +2,7 @@ import asyncio
 import os
 import csv
 import tempfile
+import uuid
 
 import aiogram
 from aiogram import Router, F
@@ -17,7 +18,7 @@ from aiogram.exceptions import TelegramForbiddenError
 from dotenv import load_dotenv
 load_dotenv()
 
-# Получение списка админов
+# Получение списка админа
 ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS").split(",")))
 
 router = Router(name="user_router")
@@ -125,25 +126,48 @@ async def cmd_export(message: Message):
         await message.answer("❌ У вас нет прав на выполнение этой команды.")
         return
 
+    print("📤 Админ запрашивает /export")
+
     pool = message.bot.dp.pool
     participants = await get_all_participants_data(pool)
+
+    print(f"📊 Найдено участников: {len(participants)}")
 
     if not participants:
         await message.answer("⚠️ Нет зарегистрированных участников.")
         return
 
-    with tempfile.NamedTemporaryFile(mode='w+', newline='', encoding='utf-8', delete=False) as tmpfile:
-        fieldnames = ['telegram_user_id', 'username', 'phone_number', 'registration_time', 'reminder_sent']
-        writer = csv.DictWriter(tmpfile, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(participants)
-        tmpfile_path = tmpfile.name
+    # Преобразуем дату в строку для CSV
+    for participant in participants:
+        participant['registration_time'] = str(participant['registration_time'])
 
-    csv_file_path = "participants_export.csv"
-    os.rename(tmpfile_path, csv_file_path)
+    # Создание временного CSV-файла
+    try:
+        with tempfile.NamedTemporaryFile(mode='w+', newline='', encoding='utf-8', delete=False) as tmpfile:
+            fieldnames = ['telegram_user_id', 'username', 'phone_number', 'registration_time', 'reminder_sent']
+            writer = csv.DictWriter(tmpfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(participants)
+            tmpfile_path = tmpfile.name
 
-    file = FSInputFile(csv_file_path)
-    await message.answer_document(file, caption="📎 Все зарегистрированные участники:")
+        csv_file_name = f"participants_export_{uuid.uuid4().hex}.csv"
+        os.rename(tmpfile_path, csv_file_name)
+        print(f"📁 CSV создан: {csv_file_name}")
+
+        try:
+            file = FSInputFile(path=csv_file_name, filename="Участники_Бег_Кофе_Танцы.csv")
+            await message.answer_document(file, caption="📎 Все зарегистрированные участники:")
+            print("📎 Файл успешно отправлен")
+        except Exception as e:
+            print(f"❌ Ошибка отправки файла: {e}")
+            await message.answer("❌ Не удалось отправить файл. Попробуйте ещё раз.")
+
+        os.remove(csv_file_name)
+        print("🗑 Временный файл удалён")
+
+    except Exception as e:
+        print(f"❌ Ошибка создания файла: {e}")
+        await message.answer("❌ Произошла ошибка при формировании файла.")
 
 
 @router.message(Command("broadcast"))

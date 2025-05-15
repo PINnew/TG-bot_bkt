@@ -3,6 +3,9 @@ import asyncpg
 from typing import Optional, List, Dict
 from dotenv import load_dotenv
 import os
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
 
@@ -45,7 +48,8 @@ async def create_table(pool):
                 reminder_sent BOOLEAN DEFAULT FALSE
             )
         """)
-        print("Таблица 'participants' готова.")
+        print("✅ Таблица 'participants' готова.")
+        logging.info("✅ Таблица 'participants' готова.")
 
 
 async def add_participant(pool, user_id: int, username: Optional[str], phone: str):
@@ -85,7 +89,6 @@ async def mark_reminder_sent(pool, user_id: int):
 
 
 async def get_all_participants_data(pool):
-    """Возвращает список всех участников с полной информацией."""
     async with pool.acquire() as connection:
         rows = await connection.fetch("""
             SELECT telegram_user_id, username, phone_number, registration_time, reminder_sent
@@ -93,6 +96,7 @@ async def get_all_participants_data(pool):
             ORDER BY registration_time DESC
         """)
         return [dict(row) for row in rows]
+        print(await get_all_participants_data(pool))
 
 
 async def get_participant_by_id(pool, user_id: int):

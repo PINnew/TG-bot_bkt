@@ -5,7 +5,7 @@ from aiogram import Bot
 from bot.database.db import get_unnotified_participants, mark_reminder_sent
 
 REMINDER_TEXT = "Напоминаем: завтра состоится мероприятие «Бег, Кофе, Танцы»! Ждём вас!"
-EVENT_TIME = datetime.now() + timedelta(minutes=10)  # тестовое событие через 2 минуты
+EVENT_TIME = datetime.now() + timedelta(minutes=2)  # тестовое событие через 2 минуты
 
 
 async def start_scheduler(bot: Bot, interval_seconds=60):

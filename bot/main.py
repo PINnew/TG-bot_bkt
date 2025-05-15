@@ -42,7 +42,7 @@ async def main():
     # Запуск планировщика напоминаний
     asyncio.create_task(start_scheduler(bot))
 
-    print("Бот запущен...")
+    print("✅ Бот запущен...")
     await dp.start_polling(bot)
 
 
