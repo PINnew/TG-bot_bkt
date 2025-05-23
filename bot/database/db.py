@@ -96,7 +96,6 @@ async def get_all_participants_data(pool):
             ORDER BY registration_time DESC
         """)
         return [dict(row) for row in rows]
-        print(await get_all_participants_data(pool))
 
 
 async def get_participant_by_id(pool, user_id: int):

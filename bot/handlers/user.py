@@ -43,22 +43,25 @@ async def cmd_start(message: Message):
         await message.answer("<<Поделиться контактом>> кнопка внизу.", reply_markup=kb_share_contact)
 
 
-@router.message(F.text)
+@router.message(F.text & ~F.text.startswith('/'))
 async def process_username(message: Message):
     user_id = message.from_user.id
 
-    # Проверка: уже зарегистрирован?
-    pool = message.bot.dp.pool
+    # Защита: pool может быть ещё не установлен
+    try:
+        pool = message.bot.dp.pool
+    except AttributeError:
+        await message.answer("❌ Сервис временно недоступен. Попробуйте позже.")
+        return
+
     existing_user = await get_participant_by_id(pool, user_id)
     if existing_user:
-        return  # Не продолжаем, если уже зарегистрирован
+        return  # Уже зарегистрирован
 
-    # Проверяем, есть ли username в состоянии
     state = message.bot.db_state.get(user_id, {})
     if "username" in state:
-        return  # Уже есть username, ждём контакт
+        return  # Ждём контакт
 
-    # Если username ещё не установлен
     state["username"] = message.text.strip()
     message.bot.db_state[user_id] = state
 
@@ -103,7 +106,11 @@ async def process_phone(message: Message):
 @router.message(Command("list"))
 async def cmd_list(message: Message):
     user_id = message.from_user.id
-    pool = message.bot.dp.pool
+    try:
+        pool = message.bot.dp.pool
+    except AttributeError:
+        await message.answer("❌ Сервис временно недоступен.")
+        return
 
     # Отладка: проверяем, есть ли пользователь в БД
     existing_user = await get_participant_by_id(pool, user_id)
@@ -120,12 +127,6 @@ async def cmd_list(message: Message):
 
 @router.message(Command("export"))
 async def cmd_export(message: Message):
-    user_id = message.from_user.id
-
-    if user_id not in ADMIN_IDS:
-        await message.answer("❌ У вас нет прав на выполнение этой команды.")
-        return
-
     print("📤 Админ запрашивает /export")
 
     pool = message.bot.dp.pool
@@ -137,47 +138,28 @@ async def cmd_export(message: Message):
         await message.answer("⚠️ Нет зарегистрированных участников.")
         return
 
-    # Преобразуем дату в строку для CSV
     for participant in participants:
         participant['registration_time'] = str(participant['registration_time'])
 
-    # Создание временного CSV-файла
-    try:
-        with tempfile.NamedTemporaryFile(mode='w+', newline='', encoding='utf-8', delete=False) as tmpfile:
-            fieldnames = ['telegram_user_id', 'username', 'phone_number', 'registration_time', 'reminder_sent']
-            writer = csv.DictWriter(tmpfile, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(participants)
-            tmpfile_path = tmpfile.name
+    with tempfile.NamedTemporaryFile(mode='w+', newline='', encoding='utf-8', delete=False) as tmpfile:
+        fieldnames = ['telegram_user_id', 'username', 'phone_number', 'registration_time', 'reminder_sent']
+        writer = csv.DictWriter(tmpfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(participants)
 
-        csv_file_name = f"participants_export_{uuid.uuid4().hex}.csv"
-        os.rename(tmpfile_path, csv_file_name)
-        print(f"📁 CSV создан: {csv_file_name}")
+    csv_file_name = f"participants_export_{uuid.uuid4().hex}.csv"
+    os.rename(tmpfile.name, csv_file_name)
 
-        try:
-            file = FSInputFile(path=csv_file_name, filename="Участники_Бег_Кофе_Танцы.csv")
-            await message.answer_document(file, caption="📎 Все зарегистрированные участники:")
-            print("📎 Файл успешно отправлен")
-        except Exception as e:
-            print(f"❌ Ошибка отправки файла: {e}")
-            await message.answer("❌ Не удалось отправить файл. Попробуйте ещё раз.")
+    file = FSInputFile(path=csv_file_name, filename="Участники_Бег_Кофе_Танцы.csv")
+    await message.answer_document(file, caption="📎 Все зарегистрированные участники:")
 
-        os.remove(csv_file_name)
-        print("🗑 Временный файл удалён")
-
-    except Exception as e:
-        print(f"❌ Ошибка создания файла: {e}")
-        await message.answer("❌ Произошла ошибка при формировании файла.")
+    os.remove(csv_file_name)
+    print("🗑 Временный файл удалён")
 
 
 @router.message(Command("broadcast"))
 async def cmd_broadcast(message: Message):
     user_id = message.from_user.id
-
-    # Проверка прав администратора
-    if user_id not in ADMIN_IDS:
-        await message.answer("❌ У вас нет прав на выполнение этой команды.")
-        return
 
     # Извлекаем текст сообщения
     args = message.text.split(maxsplit=1)
